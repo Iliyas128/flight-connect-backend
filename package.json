@@ -2,12 +2,11 @@
   "name": "flight-connect-backend",
   "version": "1.0.0",
   "description": "Backend API for Flight Connect application",
-  "main": "dist/server.js",
-  "type": "module",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "lint": "eslint src --ext .ts",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "fix-admin-password": "tsx src/scripts/fixAdminPassword.ts"

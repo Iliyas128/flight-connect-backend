@@ -12,6 +12,11 @@ export const connectDB = async (): Promise<void> => {
     console.log('✅ MongoDB connected successfully');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error);
+    // In serverless environments (Vercel) we must not kill the process;
+    // let the handler return an error response.
+    if (process.env.VERCEL) {
+      throw error;
+    }
     process.exit(1);
   }
 };

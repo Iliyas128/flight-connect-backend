@@ -10,7 +10,7 @@ dotenv.config();
 
 const app = express();
 
-// CORS configuration helper
+// CORS configuration - MUST be first middleware
 const getAllowedOrigin = (origin: string | undefined): string => {
   const allowedOrigins = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
@@ -24,7 +24,6 @@ const getAllowedOrigin = (origin: string | undefined): string => {
     return origin;
   }
   
-  // Return first allowed origin if origin doesn't match (fallback)
   return allowedOrigins[0] || '*';
 };
 
@@ -36,7 +35,7 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   return allowedOrigins.includes('*') || !origin || allowedOrigins.includes(origin);
 };
 
-// CORS middleware - simplified for serverless
+// CORS middleware - MUST be first
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigin = getAllowedOrigin(origin);
@@ -49,6 +48,20 @@ app.use((req, res, next) => {
   
   next();
 });
+
+// Explicitly handle OPTIONS for all routes
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigin = getAllowedOrigin(origin);
+  
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -89,7 +102,7 @@ const connectIfNeeded = async () => {
 };
 
 // Export serverless function handler for Vercel
-export default async function handler(req: any, res: any) {
+export default async function handler(req: express.Request, res: express.Response) {
   // Handle OPTIONS (preflight) requests immediately - BEFORE connecting to MongoDB
   // This is critical for CORS to work in serverless environments
   if (req.method === 'OPTIONS') {
