@@ -1,0 +1,282 @@
+import express, { Request, Response } from 'express';
+import { Session } from '../models/Session';
+import { Participant } from '../models/Participant';
+import { z } from 'zod';
+import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { User } from '../models/User';
+
+const router = express.Router();
+
+// Validation schemas
+const createSessionSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  registrationStartTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/),
+  endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+  closingMinutes: z.number().min(0).default(60),
+  comments: z.string().default(''),
+});
+
+const updateSessionSchema = z.object({
+  comments: z.string().optional(),
+  status: z.enum(['open', 'closing', 'closed', 'completed']).optional(),
+});
+
+// Generate unique ID
+const generateId = (): string => {
+  return Math.random().toString(36).substring(2, 11);
+};
+
+// Generate 3-letter code
+const generateSessionCode = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let code = '';
+  for (let i = 0; i < 3; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
+// Check if session code is unique (within 60 days)
+const isSessionCodeUnique = async (code: string, excludeId?: string): Promise<boolean> => {
+  const now = new Date();
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  const existingSession = await Session.findOne({
+    sessionCode: code.toUpperCase(),
+    _id: { $ne: excludeId },
+    createdAt: { $gte: sixtyDaysAgo },
+  });
+
+  return !existingSession;
+};
+
+// Generate unique session code
+const generateUniqueSessionCode = async (excludeId?: string): Promise<string> => {
+  let code = generateSessionCode();
+  let attempts = 0;
+  const maxAttempts = 1000;
+
+  while (!(await isSessionCodeUnique(code, excludeId)) && attempts < maxAttempts) {
+    code = generateSessionCode();
+    attempts++;
+  }
+
+  if (attempts >= maxAttempts) {
+    code = generateSessionCode() + Math.floor(Math.random() * 10);
+  }
+
+  return code;
+};
+
+// Calculate session status
+const calculateSessionStatus = (session: any): 'open' | 'closing' | 'closed' | 'completed' => {
+  const now = new Date();
+  const registrationStartDateTime = new Date(`${session.date}T${session.registrationStartTime}`);
+  const sessionStartDateTime = new Date(`${session.date}T${session.startTime}`);
+  const closingTime = new Date(sessionStartDateTime.getTime() - session.closingMinutes * 60 * 1000);
+
+  if (session.endTime) {
+    const sessionEndDateTime = new Date(`${session.date}T${session.endTime}`);
+    if (now >= sessionEndDateTime) {
+      return 'completed';
+    }
+  } else {
+    const defaultEndDateTime = new Date(sessionStartDateTime.getTime() + 2 * 60 * 60 * 1000);
+    if (now >= defaultEndDateTime) {
+      return 'completed';
+    }
+  }
+
+  if (now >= sessionStartDateTime) {
+    return 'closed';
+  }
+
+  if (now < registrationStartDateTime) {
+    return 'closed';
+  }
+
+  const minutesUntilClosing = (closingTime.getTime() - now.getTime()) / (1000 * 60);
+
+  if (minutesUntilClosing <= 30 && minutesUntilClosing > 0) {
+    return 'closing';
+  }
+
+  return 'open';
+};
+
+// GET /api/sessions - Get all sessions
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { status } = req.query;
+    const query: any = {};
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const sessions = await Session.find(query).sort({ date: 1, startTime: 1 });
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch sessions' });
+  }
+});
+
+// GET /api/sessions/upcoming - Get upcoming sessions
+router.get('/upcoming', async (req: Request, res: Response) => {
+  try {
+    const sessions = await Session.find({
+      status: { $ne: 'completed' },
+    }).sort({ date: 1, startTime: 1 });
+
+    // Update statuses
+    for (const session of sessions) {
+      const newStatus = calculateSessionStatus(session);
+      if (session.status !== newStatus) {
+        session.status = newStatus;
+        await session.save();
+      }
+    }
+
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching upcoming sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch upcoming sessions' });
+  }
+});
+
+// GET /api/sessions/completed - Get completed sessions
+router.get('/completed', async (req: Request, res: Response) => {
+  try {
+    const sessions = await Session.find({
+      status: 'completed',
+    }).sort({ date: -1, startTime: -1 });
+
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching completed sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch completed sessions' });
+  }
+});
+
+// GET /api/sessions/:id - Get session by ID
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const session = await Session.findOne({ id: req.params.id });
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    res.json(session);
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    res.status(500).json({ error: 'Failed to fetch session' });
+  }
+});
+
+// POST /api/sessions - Create new session (dispatcher/admin only)
+router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const validatedData = createSessionSchema.parse(req.body);
+    const sessionCode = await generateUniqueSessionCode();
+
+    const creator = req.userId ? await User.findOne({ id: req.userId }) : null;
+    const createdByName = creator?.name || creator?.username || 'Диспетчер';
+
+    const sessionData = {
+      id: generateId(),
+      sessionCode,
+      ...validatedData,
+      status: 'open' as const,
+      createdById: req.userId,
+      createdByName,
+    };
+
+    // Calculate initial status
+    const tempSession = { ...sessionData, closingMinutes: validatedData.closingMinutes || 60 };
+    sessionData.status = calculateSessionStatus(tempSession);
+
+    const session = new Session(sessionData);
+    await session.save();
+
+    res.status(201).json(session);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error creating session:', error);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+// PATCH /api/sessions/:id - Update session (dispatcher/admin only)
+router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const validatedData = updateSessionSchema.parse(req.body);
+    const session = await Session.findOne({ id: req.params.id });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    Object.assign(session, validatedData);
+    await session.save();
+
+    res.json(session);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error updating session:', error);
+    res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
+// DELETE /api/sessions/:id - Delete session (admin only, from archive)
+router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const session = await Session.findOne({ id: req.params.id });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Only allow deletion of completed sessions (from archive)
+    if (session.status !== 'completed') {
+      return res.status(400).json({ error: 'Can only delete completed sessions from archive' });
+    }
+
+    // Delete associated participants
+    await Participant.deleteMany({ sessionId: session.id });
+
+    // Delete session
+    await Session.deleteOne({ id: req.params.id });
+
+    res.json({ message: 'Session deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    res.status(500).json({ error: 'Failed to delete session' });
+  }
+});
+
+// GET /api/sessions/:id/participants - Get session participants
+router.get('/:id/participants', async (req: Request, res: Response) => {
+  try {
+    const session = await Session.findOne({ id: req.params.id });
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const participants = await Participant.find({ sessionId: session.id }).sort({
+      registeredAt: -1,
+    });
+
+    res.json(participants);
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    res.status(500).json({ error: 'Failed to fetch participants' });
+  }
+});
+
+export default router;
+

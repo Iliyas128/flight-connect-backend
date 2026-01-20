@@ -1,0 +1,40 @@
+{
+  "name": "flight-connect-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Flight Connect application",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint src --ext .ts",
+    "create-admin": "tsx src/scripts/createAdmin.ts",
+    "fix-admin-password": "tsx src/scripts/fixAdminPassword.ts"
+  },
+  "keywords": ["flight", "connect", "api", "mongodb"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "mongoose": "^8.9.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "zod": "^3.25.76",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.16.5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "@typescript-eslint/eslint-plugin": "^8.53.0",
+    "@typescript-eslint/parser": "^8.53.0",
+    "eslint": "^9.39.2"
+  }
+}
+
