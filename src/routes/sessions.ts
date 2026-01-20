@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { Session } from '../models/Session';
+import { Session, ISession } from '../models/Session';
 import { Participant } from '../models/Participant';
 import { z } from 'zod';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
@@ -106,7 +106,7 @@ const calculateSessionStatus = (session: any): 'open' | 'closing' | 'closed' | '
 };
 
 // GET /api/sessions - Get all sessions
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<Response> => {
   try {
     const { status } = req.query;
     const query: any = {};
@@ -116,15 +116,15 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const sessions = await Session.find(query).sort({ date: 1, startTime: 1 });
-    res.json(sessions);
+    return res.json(sessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
-    res.status(500).json({ error: 'Failed to fetch sessions' });
+    return res.status(500).json({ error: 'Failed to fetch sessions' });
   }
 });
 
 // GET /api/sessions/upcoming - Get upcoming sessions
-router.get('/upcoming', async (req: Request, res: Response) => {
+router.get('/upcoming', async (_req: Request, res: Response): Promise<Response> => {
   try {
     const sessions = await Session.find({
       status: { $ne: 'completed' },
@@ -139,43 +139,43 @@ router.get('/upcoming', async (req: Request, res: Response) => {
       }
     }
 
-    res.json(sessions);
+    return res.json(sessions);
   } catch (error) {
     console.error('Error fetching upcoming sessions:', error);
-    res.status(500).json({ error: 'Failed to fetch upcoming sessions' });
+    return res.status(500).json({ error: 'Failed to fetch upcoming sessions' });
   }
 });
 
 // GET /api/sessions/completed - Get completed sessions
-router.get('/completed', async (req: Request, res: Response) => {
+router.get('/completed', async (_req: Request, res: Response): Promise<Response> => {
   try {
     const sessions = await Session.find({
       status: 'completed',
     }).sort({ date: -1, startTime: -1 });
 
-    res.json(sessions);
+    return res.json(sessions);
   } catch (error) {
     console.error('Error fetching completed sessions:', error);
-    res.status(500).json({ error: 'Failed to fetch completed sessions' });
+    return res.status(500).json({ error: 'Failed to fetch completed sessions' });
   }
 });
 
 // GET /api/sessions/:id - Get session by ID
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response): Promise<Response> => {
   try {
     const session = await Session.findOne({ id: req.params.id });
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
-    res.json(session);
+    return res.json(session);
   } catch (error) {
     console.error('Error fetching session:', error);
-    res.status(500).json({ error: 'Failed to fetch session' });
+    return res.status(500).json({ error: 'Failed to fetch session' });
   }
 });
 
 // POST /api/sessions - Create new session (dispatcher/admin only)
-router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response) => {
+router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const validatedData = createSessionSchema.parse(req.body);
     const sessionCode = await generateUniqueSessionCode();
@@ -183,34 +183,35 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
     const creator = req.userId ? await User.findOne({ id: req.userId }) : null;
     const createdByName = creator?.name || creator?.username || 'Диспетчер';
 
-    const sessionData = {
+    const closingMinutes = validatedData.closingMinutes ?? 60;
+    const status: ISession['status'] = calculateSessionStatus({
+      ...validatedData,
+      closingMinutes,
+    });
+
+    const session = new Session({
       id: generateId(),
       sessionCode,
       ...validatedData,
-      status: 'open' as const,
+      closingMinutes,
+      status,
       createdById: req.userId,
       createdByName,
-    };
-
-    // Calculate initial status
-    const tempSession = { ...sessionData, closingMinutes: validatedData.closingMinutes || 60 };
-    sessionData.status = calculateSessionStatus(tempSession);
-
-    const session = new Session(sessionData);
+    });
     await session.save();
 
-    res.status(201).json(session);
+    return res.status(201).json(session);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error creating session:', error);
-    res.status(500).json({ error: 'Failed to create session' });
+    return res.status(500).json({ error: 'Failed to create session' });
   }
 });
 
 // PATCH /api/sessions/:id - Update session (dispatcher/admin only)
-router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response) => {
+router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const validatedData = updateSessionSchema.parse(req.body);
     const session = await Session.findOne({ id: req.params.id });
@@ -222,18 +223,18 @@ router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (
     Object.assign(session, validatedData);
     await session.save();
 
-    res.json(session);
+    return res.json(session);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error updating session:', error);
-    res.status(500).json({ error: 'Failed to update session' });
+    return res.status(500).json({ error: 'Failed to update session' });
   }
 });
 
 // DELETE /api/sessions/:id - Delete session (admin only, from archive)
-router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const session = await Session.findOne({ id: req.params.id });
 
@@ -252,15 +253,15 @@ router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequ
     // Delete session
     await Session.deleteOne({ id: req.params.id });
 
-    res.json({ message: 'Session deleted successfully' });
+    return res.json({ message: 'Session deleted successfully' });
   } catch (error) {
     console.error('Error deleting session:', error);
-    res.status(500).json({ error: 'Failed to delete session' });
+    return res.status(500).json({ error: 'Failed to delete session' });
   }
 });
 
 // GET /api/sessions/:id/participants - Get session participants
-router.get('/:id/participants', async (req: Request, res: Response) => {
+router.get('/:id/participants', async (req: Request, res: Response): Promise<Response> => {
   try {
     const session = await Session.findOne({ id: req.params.id });
     if (!session) {
@@ -271,10 +272,10 @@ router.get('/:id/participants', async (req: Request, res: Response) => {
       registeredAt: -1,
     });
 
-    res.json(participants);
+    return res.json(participants);
   } catch (error) {
     console.error('Error fetching participants:', error);
-    res.status(500).json({ error: 'Failed to fetch participants' });
+    return res.status(500).json({ error: 'Failed to fetch participants' });
   }
 });
 

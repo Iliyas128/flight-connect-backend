@@ -33,7 +33,7 @@ const generateCode = (): string => {
 };
 
 // GET /api/participants - Get all participants
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response): Promise<Response> => {
   try {
     const { sessionId } = req.query;
     const query: any = {};
@@ -43,29 +43,29 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const participants = await Participant.find(query).sort({ registeredAt: -1 });
-    res.json(participants);
+    return res.json(participants);
   } catch (error) {
     console.error('Error fetching participants:', error);
-    res.status(500).json({ error: 'Failed to fetch participants' });
+    return res.status(500).json({ error: 'Failed to fetch participants' });
   }
 });
 
 // GET /api/participants/:id - Get participant by ID
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response): Promise<Response> => {
   try {
     const participant = await Participant.findOne({ id: req.params.id });
     if (!participant) {
       return res.status(404).json({ error: 'Participant not found' });
     }
-    res.json(participant);
+    return res.json(participant);
   } catch (error) {
     console.error('Error fetching participant:', error);
-    res.status(500).json({ error: 'Failed to fetch participant' });
+    return res.status(500).json({ error: 'Failed to fetch participant' });
   }
 });
 
 // POST /api/participants - Create new participant
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response): Promise<Response> => {
   try {
     const validatedData = createParticipantSchema.parse(req.body);
 
@@ -105,18 +105,18 @@ router.post('/', async (req: Request, res: Response) => {
     const participant = new Participant(participantData);
     await participant.save();
 
-    res.status(201).json(participant);
+    return res.status(201).json(participant);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error creating participant:', error);
-    res.status(500).json({ error: 'Failed to create participant' });
+    return res.status(500).json({ error: 'Failed to create participant' });
   }
 });
 
 // PATCH /api/participants/:id - Update participant (dispatcher/admin only)
-router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response) => {
+router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const validatedData = updateParticipantSchema.parse(req.body);
     const participant = await Participant.findOne({ id: req.params.id });
@@ -131,18 +131,18 @@ router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (
 
     await participant.save();
 
-    res.json(participant);
+    return res.json(participant);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error updating participant:', error);
-    res.status(500).json({ error: 'Failed to update participant' });
+    return res.status(500).json({ error: 'Failed to update participant' });
   }
 });
 
 // DELETE /api/participants/:id - Delete participant
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response): Promise<Response> => {
   try {
     const participant = await Participant.findOne({ id: req.params.id });
 
@@ -152,12 +152,11 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     await Participant.deleteOne({ id: req.params.id });
 
-    res.json({ message: 'Participant deleted successfully' });
+    return res.json({ message: 'Participant deleted successfully' });
   } catch (error) {
     console.error('Error deleting participant:', error);
-    res.status(500).json({ error: 'Failed to delete participant' });
+    return res.status(500).json({ error: 'Failed to delete participant' });
   }
 });
 
 export default router;
-

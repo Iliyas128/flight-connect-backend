@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
 import { User } from '../models/User';
 import { z } from 'zod';
-import jwt from 'jsonwebtoken';
+import jwt, { Secret } from 'jsonwebtoken';
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_SECRET: Secret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
 
 // Validation schemas
 const loginSchema = z.object({
@@ -32,12 +32,11 @@ const generateId = (): string => {
 };
 
 // Generate JWT token
-const generateToken = (userId: string, role: string): string => {
-  return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-};
+const generateToken = (userId: string, role: string): string =>
+  jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
 // POST /api/auth/register - Register new pilot
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', async (req: Request, res: Response): Promise<Response> => {
   try {
     const validatedData = registerSchema.parse(req.body);
 
@@ -60,7 +59,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const token = generateToken(user.id, user.role);
 
-    res.status(201).json({
+    return res.status(201).json({
       token,
       user: {
         id: user.id,
@@ -74,12 +73,12 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error registering user:', error);
-    res.status(500).json({ error: 'Failed to register user' });
+    return res.status(500).json({ error: 'Failed to register user' });
   }
 });
 
 // POST /api/auth/login - Login user
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response): Promise<Response> => {
   try {
     const validatedData = loginSchema.parse(req.body);
 
@@ -105,7 +104,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     console.log(`Successful login: ${user.username} (${user.role})`);
 
-    res.json({
+    return res.json({
       token,
       user: {
         id: user.id,
@@ -119,12 +118,12 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error logging in:', error);
-    res.status(500).json({ error: 'Ошибка при входе в систему' });
+    return res.status(500).json({ error: 'Ошибка при входе в систему' });
   }
 });
 
 // GET /api/auth/me - Get current user
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response): Promise<Response> => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -138,19 +137,19 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       id: user.id,
       username: user.username,
       role: user.role,
       name: user.name,
     });
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
 // POST /api/auth/dispatchers - Create dispatcher (admin only)
-router.post('/dispatchers', async (req: Request, res: Response) => {
+router.post('/dispatchers', async (req: Request, res: Response): Promise<Response> => {
   try {
     // Check admin authorization
     const token = req.headers.authorization?.replace('Bearer ', '');
@@ -183,7 +182,7 @@ router.post('/dispatchers', async (req: Request, res: Response) => {
     const user = new User(userData);
     await user.save();
 
-    res.status(201).json({
+    return res.status(201).json({
       id: user.id,
       username: user.username,
       role: user.role,
@@ -195,12 +194,12 @@ router.post('/dispatchers', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error creating dispatcher:', error);
-    res.status(500).json({ error: 'Failed to create dispatcher' });
+    return res.status(500).json({ error: 'Failed to create dispatcher' });
   }
 });
 
 // GET /api/auth/dispatchers - Get all dispatchers (admin only)
-router.get('/dispatchers', async (req: Request, res: Response) => {
+router.get('/dispatchers', async (req: Request, res: Response): Promise<Response> => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
@@ -214,7 +213,7 @@ router.get('/dispatchers', async (req: Request, res: Response) => {
 
     // Admin can see dispatcher passwords (plainPassword) to provide access
     const dispatchers = await User.find({ role: 'dispatcher' }).select('-password');
-    res.json(
+    return res.json(
       dispatchers.map((d) => ({
         id: d.id,
         username: d.username,
@@ -225,7 +224,7 @@ router.get('/dispatchers', async (req: Request, res: Response) => {
     );
   } catch (error) {
     console.error('Error fetching dispatchers:', error);
-    res.status(500).json({ error: 'Failed to fetch dispatchers' });
+    return res.status(500).json({ error: 'Failed to fetch dispatchers' });
   }
 });
 

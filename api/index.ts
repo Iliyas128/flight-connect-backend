@@ -1,20 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './config/database';
-import sessionsRouter from './routes/sessions';
-import participantsRouter from './routes/participants';
-import authRouter from './routes/auth';
+import { connectDB } from '../src/config/database';
+import sessionsRouter from '../src/routes/sessions';
+import participantsRouter from '../src/routes/participants';
+import authRouter from '../src/routes/auth';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+  origin: process.env.CORS_ORIGIN || '*',
   credentials: true,
 }));
 app.use(express.json());
@@ -41,28 +40,26 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Connect to MongoDB on startup (for local development)
-if (process.env.VERCEL !== 'true') {
-  const startServer = async () => {
+// Connect to MongoDB (cached connection)
+let isConnected = false;
+
+const connectIfNeeded = async () => {
+  if (!isConnected) {
     try {
-      // Connect to MongoDB
       await connectDB();
-
-      // Start Express server
-      const PORT = process.env.PORT || 3000;
-      app.listen(PORT, () => {
-        console.log(`🚀 Server is running on http://localhost:${PORT}`);
-        console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-      });
+      isConnected = true;
     } catch (error) {
-      console.error('Failed to start server:', error);
-      process.exit(1);
+      console.error('Failed to connect to MongoDB:', error);
+      throw error;
     }
-  };
+  }
+};
 
-  startServer();
+// Export serverless function handler for Vercel
+export default async function handler(req: any, res: any) {
+  // Connect to MongoDB if not already connected
+  await connectIfNeeded();
+  
+  // Handle the request with Express app
+  return app(req as any, res as any);
 }
-
-// Export app for Vercel serverless functions
-export default app;
-
