@@ -10,8 +10,6 @@ import authRouter from './routes/auth';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:8080',

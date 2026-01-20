@@ -146,12 +146,18 @@ router.get('/upcoming', async (_req: Request, res: Response): Promise<Response> 
   }
 });
 
-// GET /api/sessions/completed - Get completed sessions
-router.get('/completed', async (_req: Request, res: Response): Promise<Response> => {
+// GET /api/sessions/completed - Get completed sessions (dispatcher/admin only, filtered by creator)
+router.get('/completed', authenticate, requireRole(['dispatcher', 'admin']), async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const sessions = await Session.find({
-      status: 'completed',
-    }).sort({ date: -1, startTime: -1 });
+    const query: any = { status: 'completed' };
+    
+    // If dispatcher, only show their own sessions
+    if (req.userRole === 'dispatcher' && req.userId) {
+      query.createdById = req.userId;
+    }
+    // Admin sees all completed sessions
+
+    const sessions = await Session.find(query).sort({ date: -1, startTime: -1 });
 
     return res.json(sessions);
   } catch (error) {

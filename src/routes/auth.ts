@@ -212,7 +212,7 @@ router.get('/dispatchers', async (req: Request, res: Response): Promise<Response
     }
 
     // Admin can see dispatcher passwords (plainPassword) to provide access
-    const dispatchers = await User.find({ role: 'dispatcher' }).select('-password');
+    const dispatchers = await User.find({ role: 'dispatcher' }).select('id username role name plainPassword');
     return res.json(
       dispatchers.map((d) => ({
         id: d.id,
