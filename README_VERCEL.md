@@ -5,7 +5,9 @@
 1. Убедитесь, что все переменные окружения настроены в Vercel Dashboard:
    - `MONGODB_URI` - URI подключения к MongoDB
    - `JWT_SECRET` - Секретный ключ для JWT токенов
-   - `CORS_ORIGIN` - Разрешенный origin для CORS (например, `https://your-frontend.vercel.app`)
+   - `CORS_ORIGIN` - Разрешенный origin для CORS (например, `https://your-frontend.vercel.app` или несколько через запятую: `https://app1.vercel.app,https://app2.vercel.app`)
+
+   **ВАЖНО**: Если используете несколько доменов, разделяйте их запятой без пробелов или с пробелами (они будут автоматически обрезаны).
 
 2. Структура проекта:
    - `api/index.ts` - Serverless функция для Vercel
