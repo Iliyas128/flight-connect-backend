@@ -32,6 +32,13 @@ const SessionSchema = new Schema<ISession>(
       minlength: 3,
       maxlength: 3,
     },
+    sessionNumber: {
+      type: Number,
+      required: false,
+      unique: true,
+      min: 1,
+      max: 9999,
+    },
     date: {
       type: String,
       required: true,

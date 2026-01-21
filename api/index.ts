@@ -4,6 +4,7 @@ import { connectDB } from '../src/config/database';
 import sessionsRouter from '../src/routes/sessions';
 import participantsRouter from '../src/routes/participants';
 import authRouter from '../src/routes/auth';
+import validKeysRouter from '../src/routes/validKeys';
 
 // Load environment variables
 dotenv.config();
@@ -12,15 +13,24 @@ const app = express();
 
 // CORS configuration - MUST be first middleware
 const getAllowedOrigin = (origin: string | undefined): string => {
+  // Default allowed origins for local development
+  const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
+  
   const allowedOrigins = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : ['*'];
+    : defaultOrigins;
   
   if (allowedOrigins.includes('*')) {
     return origin || '*';
   }
   
+  // Check if origin is in allowed list
   if (origin && allowedOrigins.includes(origin)) {
+    return origin;
+  }
+  
+  // For local development, allow localhost origins
+  if (origin && origin.startsWith('http://localhost:')) {
     return origin;
   }
   
@@ -28,11 +38,27 @@ const getAllowedOrigin = (origin: string | undefined): string => {
 };
 
 const isOriginAllowed = (origin: string | undefined): boolean => {
+  // Default allowed origins for local development
+  const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
+  
   const allowedOrigins = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : ['*'];
+    : defaultOrigins;
   
-  return allowedOrigins.includes('*') || !origin || allowedOrigins.includes(origin);
+  if (allowedOrigins.includes('*')) {
+    return true;
+  }
+  
+  if (!origin) {
+    return true; // Allow requests without origin (e.g., Postman)
+  }
+  
+  // For local development, allow localhost origins
+  if (origin.startsWith('http://localhost:')) {
+    return true;
+  }
+  
+  return allowedOrigins.includes(origin);
 };
 
 // CORS middleware - MUST be first
@@ -74,6 +100,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/participants', participantsRouter);
+app.use('/api/valid-keys', validKeysRouter);
 
 // 404 handler
 app.use((_req, res) => {

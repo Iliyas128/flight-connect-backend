@@ -69,6 +69,19 @@ const generateUniqueSessionCode = async (excludeId?: string): Promise<string> =>
   return code;
 };
 
+// Get next session number
+const getNextSessionNumber = async (): Promise<number> => {
+  const lastSession = await Session.findOne({ sessionNumber: { $exists: true } })
+    .sort({ sessionNumber: -1 })
+    .limit(1);
+  
+  if (!lastSession || !lastSession.sessionNumber) {
+    return 1;
+  }
+  
+  return lastSession.sessionNumber + 1;
+};
+
 // Calculate session status
 const calculateSessionStatus = (session: any): 'open' | 'closing' | 'closed' | 'completed' => {
   const now = new Date();
@@ -115,7 +128,8 @@ router.get('/', async (req: Request, res: Response): Promise<Response> => {
       query.status = status;
     }
 
-    const sessions = await Session.find(query).sort({ date: 1, startTime: 1 });
+    // For 'all' status, return all sessions without filtering
+    const sessions = await Session.find(query).sort({ createdAt: -1 }); // Sort by creation date, newest first
     return res.json(sessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -185,6 +199,7 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
   try {
     const validatedData = createSessionSchema.parse(req.body);
     const sessionCode = await generateUniqueSessionCode();
+    const sessionNumber = await getNextSessionNumber();
 
     const creator = req.userId ? await User.findOne({ id: req.userId }) : null;
     const createdByName = creator?.name || creator?.username || 'Диспетчер';
@@ -198,6 +213,7 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
     const session = new Session({
       id: generateId(),
       sessionCode,
+      sessionNumber,
       ...validatedData,
       closingMinutes,
       status,

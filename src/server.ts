@@ -5,14 +5,33 @@ import { connectDB } from './config/database';
 import sessionsRouter from './routes/sessions';
 import participantsRouter from './routes/participants';
 import authRouter from './routes/auth';
+import validKeysRouter from './routes/validKeys';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 // Middleware
+const corsOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : ['http://localhost:8080', 'http://localhost:8081'];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost origins for development
+    if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    
+    if (corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -27,6 +46,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/participants', participantsRouter);
+app.use('/api/valid-keys', validKeysRouter);
 
 // 404 handler
 app.use((_req, res) => {
