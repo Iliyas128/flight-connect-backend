@@ -12,9 +12,15 @@ dotenv.config();
 
 const app = express();
 // Middleware
+const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
+const productionOrigins = [
+  'https://flight-connect.vercel.app',
+  'https://flight-connect-bot.vercel.app',
+];
+
 const corsOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-  : ['http://localhost:8080', 'http://localhost:8081'];
+  : [...defaultOrigins, ...productionOrigins];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -23,6 +29,11 @@ app.use(cors({
     
     // Allow localhost origins for development
     if (origin.startsWith('http://localhost:')) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel deployments
+    if (origin.includes('.vercel.app')) {
       return callback(null, true);
     }
     

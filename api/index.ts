@@ -16,9 +16,15 @@ const getAllowedOrigin = (origin: string | undefined): string => {
   // Default allowed origins for local development
   const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
   
+  // Production origins (can be overridden by CORS_ORIGIN env var)
+  const productionOrigins = [
+    'https://flight-connect.vercel.app',
+    'https://flight-connect-bot.vercel.app',
+  ];
+  
   const allowedOrigins = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : defaultOrigins;
+    : [...defaultOrigins, ...productionOrigins];
   
   if (allowedOrigins.includes('*')) {
     return origin || '*';
@@ -34,6 +40,11 @@ const getAllowedOrigin = (origin: string | undefined): string => {
     return origin;
   }
   
+  // For Vercel deployments, allow vercel.app origins
+  if (origin && origin.includes('.vercel.app')) {
+    return origin;
+  }
+  
   return allowedOrigins[0] || '*';
 };
 
@@ -41,9 +52,15 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   // Default allowed origins for local development
   const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
   
+  // Production origins (can be overridden by CORS_ORIGIN env var)
+  const productionOrigins = [
+    'https://flight-connect.vercel.app',
+    'https://flight-connect-bot.vercel.app',
+  ];
+  
   const allowedOrigins = process.env.CORS_ORIGIN 
     ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : defaultOrigins;
+    : [...defaultOrigins, ...productionOrigins];
   
   if (allowedOrigins.includes('*')) {
     return true;
@@ -55,6 +72,11 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   
   // For local development, allow localhost origins
   if (origin.startsWith('http://localhost:')) {
+    return true;
+  }
+  
+  // For Vercel deployments, allow vercel.app origins
+  if (origin.includes('.vercel.app')) {
     return true;
   }
   
