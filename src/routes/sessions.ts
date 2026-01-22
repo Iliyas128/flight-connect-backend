@@ -86,12 +86,14 @@ const getNextSessionNumber = async (): Promise<number> => {
 // Calculate session status
 const calculateSessionStatus = (session: any): 'open' | 'closing' | 'closed' | 'completed' => {
   const now = new Date();
-  const registrationStartDateTime = new Date(`${session.date}T${session.registrationStartTime}`);
-  const sessionStartDateTime = new Date(`${session.date}T${session.startTime}`);
+
+  // Рассчитываем все времена в UTC, чтобы статусы были консистентны вне зависимости от TZ сервера
+  const registrationStartDateTime = new Date(`${session.date}T${session.registrationStartTime}Z`);
+  const sessionStartDateTime = new Date(`${session.date}T${session.startTime}Z`);
   const closingTime = new Date(sessionStartDateTime.getTime() - session.closingMinutes * 60 * 1000);
 
   if (session.endTime) {
-    const sessionEndDateTime = new Date(`${session.date}T${session.endTime}`);
+    const sessionEndDateTime = new Date(`${session.date}T${session.endTime}Z`);
     if (now >= sessionEndDateTime) {
       return 'completed';
     }
