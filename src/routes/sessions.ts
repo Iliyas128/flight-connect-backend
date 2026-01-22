@@ -234,6 +234,7 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
       : new Date(`${validatedData.date}T${validatedData.startTime}Z`).getTime() + 2 * 60 * 60 * 1000;
 
     const conflict = overlaps.find((s) => {
+      // If updating existing session later, exclude itself; now only create -> no exclude
       const start = new Date(`${s.date}T${s.startTime}Z`).getTime();
       const end = s.endTime
         ? new Date(`${s.date}T${s.endTime}Z`).getTime()
