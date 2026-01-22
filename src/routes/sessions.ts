@@ -74,12 +74,12 @@ const getNextSessionNumber = async (): Promise<number> => {
   const lastSession = await Session.findOne({ sessionNumber: { $exists: true } })
     .sort({ sessionNumber: -1 })
     .limit(1);
-  
-  if (!lastSession || !lastSession.sessionNumber) {
+
+  if (!lastSession || typeof (lastSession as any).sessionNumber !== "number") {
     return 1;
   }
-  
-  return lastSession.sessionNumber + 1;
+
+  return (lastSession as any).sessionNumber + 1;
 };
 
 // Calculate session status
@@ -105,8 +105,9 @@ const calculateSessionStatus = (session: any): 'open' | 'closing' | 'closed' | '
     return 'closed';
   }
 
+  // Registration not started yet — считаем сессию открытой для планирования
   if (now < registrationStartDateTime) {
-    return 'closed';
+    return 'open';
   }
 
   const minutesUntilClosing = (closingTime.getTime() - now.getTime()) / (1000 * 60);
@@ -130,6 +131,16 @@ router.get('/', async (req: Request, res: Response): Promise<Response> => {
 
     // For 'all' status, return all sessions without filtering
     const sessions = await Session.find(query).sort({ createdAt: -1 }); // Sort by creation date, newest first
+
+    // Обновляем статусы на лету, чтобы список был актуален
+    for (const session of sessions) {
+      const newStatus = calculateSessionStatus(session);
+      if (session.status !== newStatus) {
+        session.status = newStatus;
+        await session.save();
+      }
+    }
+
     return res.json(sessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -228,7 +239,7 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error creating session:', error);
-    return res.status(500).json({ error: 'Failed to create session' });
+    return res.status(500).json({ error: 'Ошибка при создании сессии.' });
   }
 });
 
@@ -239,7 +250,7 @@ router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (
     const session = await Session.findOne({ id: req.params.id });
 
     if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+      return res.status(404).json({ error: 'Сессия не найдена.' });
     }
 
     Object.assign(session, validatedData);
@@ -251,7 +262,7 @@ router.patch('/:id', authenticate, requireRole(['dispatcher', 'admin']), async (
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     console.error('Error updating session:', error);
-    return res.status(500).json({ error: 'Failed to update session' });
+    return res.status(500).json({ error: 'Ошибка при обновлении сессии.' });
   }
 });
 
@@ -261,12 +272,12 @@ router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequ
     const session = await Session.findOne({ id: req.params.id });
 
     if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+      return res.status(404).json({ error: 'Сессия не найдена.' });
     }
 
     // Only allow deletion of completed sessions (from archive)
     if (session.status !== 'completed') {
-      return res.status(400).json({ error: 'Can only delete completed sessions from archive' });
+      return res.status(400).json({ error: 'Из архива можно удалять только завершенные сессии.' });
     }
 
     // Delete associated participants
@@ -275,10 +286,10 @@ router.delete('/:id', authenticate, requireRole(['admin']), async (req: AuthRequ
     // Delete session
     await Session.deleteOne({ id: req.params.id });
 
-    return res.json({ message: 'Session deleted successfully' });
+    return res.json({ message: 'Сессия удалена успешно.' });
   } catch (error) {
     console.error('Error deleting session:', error);
-    return res.status(500).json({ error: 'Failed to delete session' });
+    return res.status(500).json({ error: 'Ошибка при удалении сессии.' });
   }
 });
 
@@ -287,7 +298,7 @@ router.get('/:id/participants', async (req: Request, res: Response): Promise<Res
   try {
     const session = await Session.findOne({ id: req.params.id });
     if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+      return res.status(404).json({ error: 'Сессия не найдена.' });
     }
 
     const participants = await Participant.find({ sessionId: session.id }).sort({
@@ -297,7 +308,7 @@ router.get('/:id/participants', async (req: Request, res: Response): Promise<Res
     return res.json(participants);
   } catch (error) {
     console.error('Error fetching participants:', error);
-    return res.status(500).json({ error: 'Failed to fetch participants' });
+    return res.status(500).json({ error: 'Ошибка при получении участников.' });
   }
 });
 
