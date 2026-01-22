@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { ValidKey, IValidKey } from '../models/ValidKey';
+import { ValidKey } from '../models/ValidKey';
 import { Session } from '../models/Session';
 import { z } from 'zod';
 
@@ -170,7 +170,7 @@ router.post('/', async (req: Request, res: Response): Promise<Response> => {
 });
 
 // GET /api/valid-keys/generate - Generate a unique key (for bot)
-router.get('/generate/unique', async (req: Request, res: Response): Promise<Response> => {
+router.get('/generate/unique', async (_req: Request, res: Response): Promise<Response> => {
   try {
     const key = await generateUniqueKey();
     return res.json({ key });

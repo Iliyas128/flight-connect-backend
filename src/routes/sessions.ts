@@ -75,11 +75,12 @@ const getNextSessionNumber = async (): Promise<number> => {
     .sort({ sessionNumber: -1 })
     .limit(1);
 
-  if (!lastSession || typeof (lastSession as any).sessionNumber !== "number") {
+  const lastNumber = lastSession?.sessionNumber;
+  if (typeof lastNumber !== 'number') {
     return 1;
   }
 
-  return (lastSession as any).sessionNumber + 1;
+  return lastNumber + 1;
 };
 
 // Calculate session status

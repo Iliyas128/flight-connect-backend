@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface ISession extends Document {
   id: string;
   sessionCode: string;
+  sessionNumber?: number;
   date: string; // ISO date string (YYYY-MM-DD)
   registrationStartTime: string; // HH:mm format
   startTime: string; // HH:mm format
