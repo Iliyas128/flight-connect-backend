@@ -224,6 +224,29 @@ router.post('/', authenticate, requireRole(['dispatcher', 'admin']), async (req:
       closingMinutes,
     });
 
+    // Check overlap with other sessions (same day, any dispatcher) — times are in UTC strings HH:mm
+    const overlaps = await Session.find({
+      date: validatedData.date,
+    });
+    const newStart = new Date(`${validatedData.date}T${validatedData.startTime}Z`).getTime();
+    const newEnd = validatedData.endTime
+      ? new Date(`${validatedData.date}T${validatedData.endTime}Z`).getTime()
+      : new Date(`${validatedData.date}T${validatedData.startTime}Z`).getTime() + 2 * 60 * 60 * 1000;
+
+    const conflict = overlaps.find((s) => {
+      const start = new Date(`${s.date}T${s.startTime}Z`).getTime();
+      const end = s.endTime
+        ? new Date(`${s.date}T${s.endTime}Z`).getTime()
+        : new Date(`${s.date}T${s.startTime}Z`).getTime() + 2 * 60 * 60 * 1000;
+      return Math.max(start, newStart) < Math.min(end, newEnd);
+    });
+
+    if (conflict) {
+      return res.status(400).json({
+        error: `Пересечение сессии диспетчера ${conflict.createdByName || 'другой диспетчер'} (${conflict.startTime}-${conflict.endTime || '—'})`,
+      });
+    }
+
     const session = new Session({
       id: generateId(),
       sessionCode,
