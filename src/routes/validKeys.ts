@@ -123,6 +123,41 @@ router.post('/', async (req: Request, res: Response): Promise<Response> => {
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
+
+    // Recalculate session status in UTC to ensure it's up-to-date
+    const now = new Date();
+    const registrationStartDateTime = new Date(`${session.date}T${session.registrationStartTime}Z`);
+    const sessionStartDateTime = new Date(`${session.date}T${session.startTime}Z`);
+    const closingTime = new Date(sessionStartDateTime.getTime() - session.closingMinutes * 60 * 1000);
+    let sessionEndDateTime: Date;
+    if (session.endTime) {
+      sessionEndDateTime = new Date(`${session.date}T${session.endTime}Z`);
+    } else {
+      sessionEndDateTime = new Date(sessionStartDateTime.getTime() + 2 * 60 * 60 * 1000);
+    }
+
+    let currentStatus: 'open' | 'closing' | 'closed' | 'completed';
+    if (now >= sessionEndDateTime) {
+      currentStatus = 'completed';
+    } else if (now >= sessionStartDateTime) {
+      currentStatus = 'closed';
+    } else if (now < registrationStartDateTime) {
+      currentStatus = 'open';
+    } else {
+      const minutesUntilClosing = (closingTime.getTime() - now.getTime()) / (1000 * 60);
+      if (minutesUntilClosing <= 30 && minutesUntilClosing > 0) {
+        currentStatus = 'closing';
+      } else if (minutesUntilClosing <= 0) {
+        currentStatus = 'closed';
+      } else {
+        currentStatus = 'open';
+      }
+    }
+
+    // Disallow adding keys for closed or completed sessions
+    if (currentStatus === 'closed' || currentStatus === 'completed') {
+      return res.status(400).json({ error: 'Cannot add keys for closed or completed sessions' });
+    }
     
     // Check if key is unique
     if (!(await isKeyUnique(validatedData.key))) {
