@@ -58,51 +58,6 @@ const getAllowedOrigin = (origin: string | undefined): string => {
   return allowedOrigins[0] || '*';
 };
 
-const isOriginAllowed = (origin: string | undefined): boolean => {
-  // Default allowed origins for local development
-  const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
-  
-  // Production origins (can be overridden by CORS_ORIGIN env var)
-  const productionOrigins = [
-    'https://flight-connect.vercel.app',
-    'https://flight-connect-bot.vercel.app',
-    'http://www.skyride.pro',
-    'https://www.skyride.pro',
-    'http://skyride.pro',
-    'https://skyride.pro',
-  ];
-  
-  const envOrigins = process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
-    : [];
-  const allowedOrigins = [...defaultOrigins, ...productionOrigins, ...envOrigins];
-  
-  if (allowedOrigins.includes('*')) {
-    return true;
-  }
-  
-  if (!origin) {
-    return true; // Allow requests without origin (e.g., Postman)
-  }
-  
-  // For local development, allow localhost origins
-  if (origin.startsWith('http://localhost:')) {
-    return true;
-  }
-  
-  // For Vercel deployments, allow vercel.app origins
-  if (origin.includes('.vercel.app')) {
-    return true;
-  }
-  
-  // Allow skyride.pro domain and subdomains
-  if (origin === 'https://skyride.pro' || origin === 'http://skyride.pro' || origin.includes('.skyride.pro')) {
-    return true;
-  }
-  
-  return allowedOrigins.includes(origin);
-};
-
 // CORS middleware - MUST be first
 app.use((req, res, next) => {
   const origin = req.headers.origin;
