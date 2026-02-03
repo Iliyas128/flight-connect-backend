@@ -173,21 +173,19 @@ const connectIfNeeded = async () => {
 // Export serverless function handler for Vercel
 export default async function handler(req: express.Request, res: express.Response) {
   // Handle OPTIONS (preflight) requests immediately - BEFORE connecting to MongoDB
-  // This is critical for CORS to work in serverless environments
+  // Always allow preflight and set CORS headers - never return 403 (browser would block with "no CORS header")
   if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
+    const origin = Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin;
+    const allowedOrigin = origin && (origin.startsWith('http://') || origin.startsWith('https://'))
+      ? origin
+      : (getAllowedOrigin(origin) || '*');
     
-    if (isOriginAllowed(origin)) {
-      const allowedOrigin = getAllowedOrigin(origin);
-      res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Max-Age', '86400');
-      return res.status(204).end();
-    } else {
-      return res.status(403).json({ error: 'CORS not allowed' });
-    }
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
   }
 
   // Connect to MongoDB if not already connected
