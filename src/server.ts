@@ -12,21 +12,19 @@ dotenv.config();
 
 const app = express();
 // Middleware
-const defaultOrigins = ['http://localhost:8080', 'http://localhost:8081'];
-const productionOrigins = [
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://localhost:8081',
   'https://flight-connect.vercel.app',
   'https://flight-connect-bot.vercel.app',
-];
-const allowedOrigins = [
-  "http://www.skyride.pro",
-  "https://www.skyride.pro",
-  "http://www.g.skyride.pro",
-  "https://www.g.skyride.pro"
+  'http://www.skyride.pro',
+  'https://www.skyride.pro',
+  'http://www.g.skyride.pro',
+  'https://www.g.skyride.pro',
+  'http://skyride.pro',
+  'https://skyride.pro',
 ];
 
-const corsOrigins = process.env.CORS_ORIGIN 
-  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-  : [...defaultOrigins, ...productionOrigins];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -47,13 +45,17 @@ app.use(cors({
       return callback(null, true);
     }
     
-    return callback(new Error('Not allowed by CORS'));
-    
+    console.warn(`Unknown origin attempted access: ${origin}`);
+    return callback(null, true); // Изменено с Error на true
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Дополнительная обработка preflight запросов
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
