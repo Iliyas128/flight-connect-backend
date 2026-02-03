@@ -17,6 +17,12 @@ const productionOrigins = [
   'https://flight-connect.vercel.app',
   'https://flight-connect-bot.vercel.app',
 ];
+const allowedOrigins = [
+  "http://www.skyride.pro",
+  "https://www.skyride.pro",
+  "http://www.g.skyride.pro",
+  "https://www.g.skyride.pro"
+];
 
 const corsOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
@@ -36,14 +42,17 @@ app.use(cors({
     if (origin.includes('.vercel.app')) {
       return callback(null, true);
     }
-    
-    if (corsOrigins.includes('*') || corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    return callback(new Error('Not allowed by CORS'));
+    
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
