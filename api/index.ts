@@ -20,6 +20,10 @@ const getAllowedOrigin = (origin: string | undefined): string => {
   const productionOrigins = [
     'https://flight-connect.vercel.app',
     'https://flight-connect-bot.vercel.app',
+    'http://www.skyride.pro',
+    'https://www.skyride.pro',
+    'http://skyride.pro',
+    'https://skyride.pro',
   ];
   
   const allowedOrigins = process.env.CORS_ORIGIN 
@@ -56,6 +60,10 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   const productionOrigins = [
     'https://flight-connect.vercel.app',
     'https://flight-connect-bot.vercel.app',
+    'http://www.skyride.pro',
+    'https://www.skyride.pro',
+    'http://skyride.pro',
+    'https://skyride.pro',
   ];
   
   const allowedOrigins = process.env.CORS_ORIGIN 
