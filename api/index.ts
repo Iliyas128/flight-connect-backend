@@ -26,9 +26,10 @@ const getAllowedOrigin = (origin: string | undefined): string => {
     'https://skyride.pro',
   ];
   
-  const allowedOrigins = process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : [...defaultOrigins, ...productionOrigins];
+  const envOrigins = process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+    : [];
+  const allowedOrigins = [...defaultOrigins, ...productionOrigins, ...envOrigins];
   
   if (allowedOrigins.includes('*')) {
     return origin || '*';
@@ -49,6 +50,11 @@ const getAllowedOrigin = (origin: string | undefined): string => {
     return origin;
   }
   
+  // Allow skyride.pro domain and subdomains
+  if (origin && (origin === 'https://skyride.pro' || origin === 'http://skyride.pro' || origin.includes('.skyride.pro'))) {
+    return origin;
+  }
+  
   return allowedOrigins[0] || '*';
 };
 
@@ -66,9 +72,10 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
     'https://skyride.pro',
   ];
   
-  const allowedOrigins = process.env.CORS_ORIGIN 
-    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
-    : [...defaultOrigins, ...productionOrigins];
+  const envOrigins = process.env.CORS_ORIGIN 
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
+    : [];
+  const allowedOrigins = [...defaultOrigins, ...productionOrigins, ...envOrigins];
   
   if (allowedOrigins.includes('*')) {
     return true;
@@ -85,6 +92,11 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   
   // For Vercel deployments, allow vercel.app origins
   if (origin.includes('.vercel.app')) {
+    return true;
+  }
+  
+  // Allow skyride.pro domain and subdomains
+  if (origin === 'https://skyride.pro' || origin === 'http://skyride.pro' || origin.includes('.skyride.pro')) {
     return true;
   }
   
