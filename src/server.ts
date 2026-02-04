@@ -21,8 +21,12 @@ const allowedOrigins = [
   'https://www.skyride.pro',
   'http://www.g.skyride.pro',
   'https://www.g.skyride.pro',
+  'http://www.a.skyride.pro',
+  'https://www.a.skyride.pro',
   'http://skyride.pro',
   'https://skyride.pro',
+  'http://a.skyride.pro',
+  'https://a.skyride.pro',
 ];
 
 
